@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/litsea/sentry"
+	sentry "github.com/litsea/sentry-slog"
 	slogmulti "github.com/samber/slog-multi"
 	"github.com/spf13/viper"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -180,17 +180,15 @@ func getLevel(sub *viper.Viper) *slog.LevelVar {
 }
 
 func newSentryHandler(sub *viper.Viper, rev string) (slog.Handler, error) {
-	hub, err := sentry.New(
+	h, err := sentry.NewHandler(
 		sentry.WithDSN(sub.GetString("dsn")),
 		sentry.WithEnvironment(sub.GetString("env")),
 		sentry.WithRelease(rev),
 		sentry.WithDebug(sub.GetBool("debug")),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("log.NewSentryHandler: %w", err)
+		return nil, fmt.Errorf("log.newSentryHandler: %w", err)
 	}
 
-	defer hub.Flush(2 * time.Second)
-
-	return sentry.NewLogHandler(hub), nil
+	return h, nil
 }

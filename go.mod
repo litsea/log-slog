@@ -3,7 +3,7 @@ module github.com/litsea/log-slog
 go 1.24.0
 
 require (
-	github.com/litsea/sentry v0.1.0
+	github.com/litsea/sentry-slog v0.2.0
 	github.com/samber/slog-multi v1.4.0
 	github.com/spf13/viper v1.20.1
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
