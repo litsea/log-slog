@@ -11,10 +11,16 @@ check-golangci-lint:
 	@which golangci-lint > /dev/null 2>&1 || (echo "Error: golangci-lint is not installed" && exit 1)
 
 # Targets that require the checks
+update: check-go
 vet: check-go
 lint: check-golangci-lint
 test: check-go
 lint-fix: check-golangci-lint
+
+.PHONY: update
+update: ## Update go.mod
+	go get -u -v
+	go mod tidy -v
 
 .PHONY: vet
 vet: ## Run vet

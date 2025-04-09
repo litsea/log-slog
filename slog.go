@@ -185,6 +185,18 @@ func newSentryHandler(sub *viper.Viper, rev string) (slog.Handler, error) {
 		sentry.WithEnvironment(sub.GetString("env")),
 		sentry.WithRelease(rev),
 		sentry.WithDebug(sub.GetBool("debug")),
+		// Other log handlers can set the stacktrace in the log attributes,
+		// But for the Sentry handler, we use `sentry.WithAttachStacktrace(true)` to capture the stacktrace,
+		// So we need to ignore it here
+		// See:
+		// github.com/samber/slog-sentry/converter.go#DefaultConverter
+		// github.com/samber/slog-common/attributes.go#RemoveEmptyAttrs()
+		sentry.WithLogReplaceAttr(func(groups []string, a slog.Attr) slog.Attr {
+			if a.Key == "stacktrace" {
+				a.Key = ""
+			}
+			return a
+		}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("log.newSentryHandler: %w", err)
