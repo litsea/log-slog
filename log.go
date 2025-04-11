@@ -1,26 +1,81 @@
 package log
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/spf13/viper"
 )
 
-var logger *slog.Logger
+var logger = &Logger{}
+
+type Logger struct {
+	sl *slog.Logger
+}
 
 func Set(v *viper.Viper) error {
 	l, err := New(v)
 	if err != nil {
-		return err
+		return fmt.Errorf("log.Set: %w", err)
 	}
 
-	logger = l
+	logger = &Logger{sl: l}
 
 	return nil
 }
 
-func Get() *slog.Logger {
-	return logger
+func GetSlog() *slog.Logger {
+	return logger.sl
+}
+
+func (l *Logger) Debug(msg string, args ...any) {
+	if l.sl == nil {
+		return
+	}
+
+	l.sl.Debug(msg, args...)
+}
+
+func (l *Logger) Info(msg string, args ...any) {
+	if l.sl == nil {
+		return
+	}
+
+	l.sl.Info(msg, args...)
+}
+
+func (l *Logger) Warn(msg string, args ...any) {
+	if l.sl == nil {
+		return
+	}
+
+	l.sl.Warn(msg, args...)
+}
+
+func (l *Logger) Error(msg string, args ...any) {
+	if l.sl == nil {
+		return
+	}
+
+	l.sl.Error(msg, args...)
+}
+
+func (l *Logger) With(args ...any) *Logger {
+	if logger.sl == nil {
+		return logger
+	}
+
+	l.sl = l.sl.With(args...)
+	return l
+}
+
+func (l *Logger) WithGroup(name string) *Logger {
+	if l.sl == nil {
+		return l
+	}
+
+	l.sl = logger.sl.WithGroup(name)
+	return l
 }
 
 func Debug(msg string, args ...any) {
@@ -39,10 +94,10 @@ func Error(msg string, args ...any) {
 	logger.Error(msg, args...)
 }
 
-func With(args ...any) *slog.Logger {
+func With(args ...any) *Logger {
 	return logger.With(args...)
 }
 
-func WithGroup(name string) *slog.Logger {
+func WithGroup(name string) *Logger {
 	return logger.WithGroup(name)
 }
