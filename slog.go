@@ -16,8 +16,9 @@ import (
 )
 
 var (
+	errEmptyLogConfig    = fmt.Errorf("empty log config")
 	errInvalidLogHandler = fmt.Errorf("invalid log handler")
-	errNoLogHandler      = fmt.Errorf("no log handler")
+	errNoValidLogHandler = fmt.Errorf("no valid log handler")
 	errEmptyFilename     = fmt.Errorf("empty filename")
 )
 
@@ -44,6 +45,10 @@ const (
 )
 
 func New(v *viper.Viper) (*slog.Logger, error) {
+	if v == nil {
+		return nil, fmt.Errorf("log.New: %w", errEmptyLogConfig)
+	}
+
 	cfgHs := v.GetStringSlice("handlers")
 	hs := make([]slog.Handler, 0, len(cfgHs))
 
@@ -72,7 +77,7 @@ func New(v *viper.Viper) (*slog.Logger, error) {
 		}
 
 		if err != nil {
-			slog.Error("log.New", "err", err)
+			slog.Warn("log.New: parse handler failed", "handler", subH, "err", err)
 			continue
 		}
 
@@ -80,7 +85,7 @@ func New(v *viper.Viper) (*slog.Logger, error) {
 	}
 
 	if len(hs) == 0 {
-		slog.Warn("log.New", "err", errNoLogHandler)
+		return nil, fmt.Errorf("log.New: %w", errNoValidLogHandler)
 	}
 
 	return slog.New(
