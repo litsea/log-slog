@@ -28,8 +28,16 @@ func Set(v *viper.Viper, opts ...Option) error {
 	return nil
 }
 
+func Get() *Logger {
+	return logger
+}
+
 func GetSlog() *slog.Logger {
 	return logger.sl
+}
+
+func (l *Logger) GetSlog() *slog.Logger {
+	return l.sl
 }
 
 func (l *Logger) SetLevel(h, lv string) bool {
