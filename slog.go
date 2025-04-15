@@ -44,16 +44,27 @@ const (
 	LevelError = "error"
 )
 
-func New(v *viper.Viper) (*slog.Logger, error) {
+func New(v *viper.Viper, opts ...Option) (*Logger, error) {
 	if v == nil {
 		return nil, fmt.Errorf("log.New: %w", errEmptyLogConfig)
 	}
 
-	cfgHs := v.GetStringSlice("handlers")
-	hs := make([]slog.Handler, 0, len(cfgHs))
+	l := &Logger{}
+
+	for _, opt := range opts {
+		opt(l)
+	}
+
+	var (
+		cfgHs = v.GetStringSlice("handlers")
+		hs    = make([]slog.Handler, 0, len(cfgHs))
+		// Log levels for handlers (except sentry)
+		lvs = make(map[string]*slog.LevelVar, len(cfgHs))
+	)
 
 	var (
 		h   slog.Handler
+		lv  *slog.LevelVar
 		err error
 	)
 
@@ -66,12 +77,12 @@ func New(v *viper.Viper) (*slog.Logger, error) {
 		subH := sub.GetString("handler")
 		switch subH {
 		case HandlerText:
-			h, err = newTextHandler(sub)
+			h, lv, err = newTextHandler(sub)
 		case HandlerJSON:
-			h, err = newJSONHandler(sub)
+			h, lv, err = newJSONHandler(sub)
 		case HandlerSentry:
-			rev := v.GetString("rev")
-			h, err = newSentryHandler(sub, rev)
+			h, err = newSentryHandler(sub, l.gitRev)
+			lv = nil
 		default:
 			err = errInvalidLogHandler
 		}
@@ -82,15 +93,25 @@ func New(v *viper.Viper) (*slog.Logger, error) {
 		}
 
 		hs = append(hs, h)
+		if lv != nil {
+			lvs[ch] = lv
+		}
 	}
 
 	if len(hs) == 0 {
 		return nil, fmt.Errorf("log.New: %w", errNoValidLogHandler)
 	}
 
-	return slog.New(
+	sl := slog.New(
 		slogmulti.Fanout(hs...),
-	), nil
+	)
+	if l.version != "" {
+		sl = sl.With("project.version", l.version)
+	}
+	l.sl = sl
+	l.lvs = lvs
+
+	return l, nil
 }
 
 func replaceDateTimeFunc(_ []string, a slog.Attr) slog.Attr {
@@ -102,10 +123,10 @@ func replaceDateTimeFunc(_ []string, a slog.Attr) slog.Attr {
 	return a
 }
 
-func newTextHandler(sub *viper.Viper) (slog.Handler, error) {
+func newTextHandler(sub *viper.Viper) (slog.Handler, *slog.LevelVar, error) {
 	w, err := getWriter(sub)
 	if err != nil {
-		return nil, fmt.Errorf("log.newTextHandler: %w", err)
+		return nil, nil, fmt.Errorf("log.newTextHandler: %w", err)
 	}
 
 	lv := getLevel(sub)
@@ -114,13 +135,13 @@ func newTextHandler(sub *viper.Viper) (slog.Handler, error) {
 		AddSource:   true,
 		Level:       lv,
 		ReplaceAttr: replaceDateTimeFunc,
-	}), nil
+	}), lv, nil
 }
 
-func newJSONHandler(sub *viper.Viper) (slog.Handler, error) {
+func newJSONHandler(sub *viper.Viper) (slog.Handler, *slog.LevelVar, error) {
 	w, err := getWriter(sub)
 	if err != nil {
-		return nil, fmt.Errorf("log.newJSONHandler: %w", err)
+		return nil, nil, fmt.Errorf("log.newJSONHandler: %w", err)
 	}
 
 	lv := getLevel(sub)
@@ -129,7 +150,7 @@ func newJSONHandler(sub *viper.Viper) (slog.Handler, error) {
 		AddSource:   true,
 		Level:       lv,
 		ReplaceAttr: replaceDateTimeFunc,
-	}), nil
+	}), lv, nil
 }
 
 func getWriter(sub *viper.Viper) (io.Writer, error) {
@@ -184,11 +205,11 @@ func getLevel(sub *viper.Viper) *slog.LevelVar {
 	return lv
 }
 
-func newSentryHandler(sub *viper.Viper, rev string) (slog.Handler, error) {
+func newSentryHandler(sub *viper.Viper, rel string) (slog.Handler, error) {
 	h, err := sentry.NewHandler(
 		sentry.WithDSN(sub.GetString("dsn")),
 		sentry.WithEnvironment(sub.GetString("env")),
-		sentry.WithRelease(rev),
+		sentry.WithRelease(rel),
 		sentry.WithDebug(sub.GetBool("debug")),
 		// Other log handlers can set the stacktrace in the log attributes,
 		// But for the Sentry handler, we use `sentry.WithAttachStacktrace(true)` to capture the stacktrace,
