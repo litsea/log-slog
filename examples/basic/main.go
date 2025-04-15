@@ -31,9 +31,8 @@ func main() {
 	}
 
 	logCfg := viper.Sub("log")
-	logCfg.Set("rev", "0.1.0-dev")
 
-	err = log.Set(logCfg)
+	err = log.Set(logCfg, log.WithVersion("0.1.0-dev"))
 	if err != nil {
 		fmt.Println("main: set log, ", err)
 		os.Exit(1)

@@ -3,6 +3,7 @@ package log
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -10,22 +11,52 @@ import (
 var logger = &Logger{}
 
 type Logger struct {
-	sl *slog.Logger
+	sl      *slog.Logger
+	lvs     map[string]*slog.LevelVar
+	version string
+	gitRev  string
 }
 
-func Set(v *viper.Viper) error {
-	l, err := New(v)
+func Set(v *viper.Viper, opts ...Option) error {
+	l, err := New(v, opts...)
 	if err != nil {
 		return fmt.Errorf("log.Set: %w", err)
 	}
 
-	logger = &Logger{sl: l}
+	logger = l
 
 	return nil
 }
 
 func GetSlog() *slog.Logger {
 	return logger.sl
+}
+
+func (l *Logger) SetLevel(h, lv string) bool {
+	if l.lvs == nil {
+		return false
+	}
+
+	lvl, ok := l.lvs[h]
+	if !ok {
+		return false
+	}
+
+	lv = strings.ToLower(lv)
+	switch lv {
+	case "debug":
+		lvl.Set(slog.LevelDebug)
+	case "info":
+		lvl.Set(slog.LevelInfo)
+	case "warn":
+		lvl.Set(slog.LevelWarn)
+	case "error":
+		lvl.Set(slog.LevelError)
+	default:
+		return false
+	}
+
+	return true
 }
 
 func (l *Logger) Debug(msg string, args ...any) {
@@ -65,8 +96,12 @@ func (l *Logger) With(args ...any) *Logger {
 		return logger
 	}
 
-	l.sl = l.sl.With(args...)
-	return l
+	return &Logger{
+		sl:      l.sl.With(args...),
+		lvs:     l.lvs,
+		version: l.version,
+		gitRev:  l.gitRev,
+	}
 }
 
 func (l *Logger) WithGroup(name string) *Logger {
@@ -74,8 +109,16 @@ func (l *Logger) WithGroup(name string) *Logger {
 		return l
 	}
 
-	l.sl = logger.sl.WithGroup(name)
-	return l
+	return &Logger{
+		sl:      l.sl.WithGroup(name),
+		lvs:     l.lvs,
+		version: l.version,
+		gitRev:  l.gitRev,
+	}
+}
+
+func SetLevel(h, lv string) bool {
+	return logger.SetLevel(h, lv)
 }
 
 func Debug(msg string, args ...any) {
