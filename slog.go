@@ -77,11 +77,11 @@ func New(v *viper.Viper, opts ...Option) (*Logger, error) {
 		subH := sub.GetString("handler")
 		switch subH {
 		case HandlerText:
-			h, lv, err = newTextHandler(sub)
+			h, lv, err = l.newTextHandler(sub)
 		case HandlerJSON:
-			h, lv, err = newJSONHandler(sub)
+			h, lv, err = l.newJSONHandler(sub)
 		case HandlerSentry:
-			h, err = newSentryHandler(sub, l.gitRev)
+			h, err = l.newSentryHandler(sub)
 			lv = nil
 		default:
 			err = errInvalidLogHandler
@@ -123,7 +123,7 @@ func replaceDateTimeFunc(_ []string, a slog.Attr) slog.Attr {
 	return a
 }
 
-func newTextHandler(sub *viper.Viper) (slog.Handler, *slog.LevelVar, error) {
+func (l *Logger) newTextHandler(sub *viper.Viper) (slog.Handler, *slog.LevelVar, error) {
 	w, err := getWriter(sub)
 	if err != nil {
 		return nil, nil, fmt.Errorf("log.newTextHandler: %w", err)
@@ -132,13 +132,13 @@ func newTextHandler(sub *viper.Viper) (slog.Handler, *slog.LevelVar, error) {
 	lv := getLevel(sub)
 
 	return slog.NewTextHandler(w, &slog.HandlerOptions{
-		AddSource:   true,
+		AddSource:   l.addSource,
 		Level:       lv,
 		ReplaceAttr: replaceDateTimeFunc,
 	}), lv, nil
 }
 
-func newJSONHandler(sub *viper.Viper) (slog.Handler, *slog.LevelVar, error) {
+func (l *Logger) newJSONHandler(sub *viper.Viper) (slog.Handler, *slog.LevelVar, error) {
 	w, err := getWriter(sub)
 	if err != nil {
 		return nil, nil, fmt.Errorf("log.newJSONHandler: %w", err)
@@ -147,7 +147,7 @@ func newJSONHandler(sub *viper.Viper) (slog.Handler, *slog.LevelVar, error) {
 	lv := getLevel(sub)
 
 	return slog.NewJSONHandler(w, &slog.HandlerOptions{
-		AddSource:   true,
+		AddSource:   l.addSource,
 		Level:       lv,
 		ReplaceAttr: replaceDateTimeFunc,
 	}), lv, nil
@@ -205,11 +205,11 @@ func getLevel(sub *viper.Viper) *slog.LevelVar {
 	return lv
 }
 
-func newSentryHandler(sub *viper.Viper, rel string) (slog.Handler, error) {
+func (l *Logger) newSentryHandler(sub *viper.Viper) (slog.Handler, error) {
 	h, err := sentry.NewHandler(
 		sentry.WithDSN(sub.GetString("dsn")),
 		sentry.WithEnvironment(sub.GetString("env")),
-		sentry.WithRelease(rel),
+		sentry.WithRelease(l.gitRev),
 		sentry.WithDebug(sub.GetBool("debug")),
 		// Other log handlers can set the stacktrace in the log attributes,
 		// But for the Sentry handler, we use `sentry.WithAttachStacktrace(true)` to capture the stacktrace,
