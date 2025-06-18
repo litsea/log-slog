@@ -13,3 +13,17 @@ func WithGitRev(rev string) Option {
 		l.gitRev = rev
 	}
 }
+
+func WithSkipLevel(skip int) Option {
+	return func(l *Logger) {
+		if skip > 0 {
+			l.skip = skip
+		}
+	}
+}
+
+func WithAddSource(v bool) Option {
+	return func(l *Logger) {
+		l.addSource = v
+	}
+}

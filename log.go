@@ -1,9 +1,12 @@
 package log
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
+	"runtime"
 	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 )
@@ -11,10 +14,12 @@ import (
 var logger = &Logger{}
 
 type Logger struct {
-	sl      *slog.Logger
-	lvs     map[string]*slog.LevelVar
-	version string
-	gitRev  string
+	sl        *slog.Logger
+	lvs       map[string]*slog.LevelVar
+	version   string
+	gitRev    string
+	skip      int
+	addSource bool
 }
 
 func Set(v *viper.Viper, opts ...Option) error {
@@ -67,12 +72,37 @@ func (l *Logger) SetLevel(h, lv string) bool {
 	return true
 }
 
+func (l *Logger) log(ctx context.Context, lv slog.Level, msg string, args ...any) {
+	if !l.sl.Enabled(ctx, lv) {
+		return
+	}
+
+	var pc uintptr
+	if l.addSource {
+		// skip [runtime.Callers, this function, this function's caller]
+		skip := 3
+		if l.skip > 0 {
+			skip = l.skip
+		}
+		var pcs [1]uintptr
+		runtime.Callers(skip, pcs[:])
+		pc = pcs[0]
+	}
+
+	r := slog.NewRecord(time.Now(), lv, msg, pc)
+	r.Add(args...)
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	_ = l.sl.Handler().Handle(ctx, r)
+}
+
 func (l *Logger) Debug(msg string, args ...any) {
 	if l.sl == nil {
 		return
 	}
 
-	l.sl.Debug(msg, args...)
+	l.log(context.Background(), slog.LevelDebug, msg, args...)
 }
 
 func (l *Logger) Info(msg string, args ...any) {
@@ -80,7 +110,7 @@ func (l *Logger) Info(msg string, args ...any) {
 		return
 	}
 
-	l.sl.Info(msg, args...)
+	l.log(context.Background(), slog.LevelInfo, msg, args...)
 }
 
 func (l *Logger) Warn(msg string, args ...any) {
@@ -88,7 +118,7 @@ func (l *Logger) Warn(msg string, args ...any) {
 		return
 	}
 
-	l.sl.Warn(msg, args...)
+	l.log(context.Background(), slog.LevelWarn, msg, args...)
 }
 
 func (l *Logger) Error(msg string, args ...any) {
@@ -96,7 +126,7 @@ func (l *Logger) Error(msg string, args ...any) {
 		return
 	}
 
-	l.sl.Error(msg, args...)
+	l.log(context.Background(), slog.LevelError, msg, args...)
 }
 
 func (l *Logger) With(args ...any) *Logger {
@@ -105,10 +135,12 @@ func (l *Logger) With(args ...any) *Logger {
 	}
 
 	return &Logger{
-		sl:      l.sl.With(args...),
-		lvs:     l.lvs,
-		version: l.version,
-		gitRev:  l.gitRev,
+		sl:        l.sl.With(args...),
+		lvs:       l.lvs,
+		version:   l.version,
+		gitRev:    l.gitRev,
+		skip:      l.skip,
+		addSource: l.addSource,
 	}
 }
 
@@ -118,10 +150,12 @@ func (l *Logger) WithGroup(name string) *Logger {
 	}
 
 	return &Logger{
-		sl:      l.sl.WithGroup(name),
-		lvs:     l.lvs,
-		version: l.version,
-		gitRev:  l.gitRev,
+		sl:        l.sl.WithGroup(name),
+		lvs:       l.lvs,
+		version:   l.version,
+		gitRev:    l.gitRev,
+		skip:      l.skip,
+		addSource: l.addSource,
 	}
 }
 
@@ -130,19 +164,19 @@ func SetLevel(h, lv string) bool {
 }
 
 func Debug(msg string, args ...any) {
-	logger.Debug(msg, args...)
+	logger.log(context.Background(), slog.LevelDebug, msg, args...)
 }
 
 func Info(msg string, args ...any) {
-	logger.Info(msg, args...)
+	logger.log(context.Background(), slog.LevelInfo, msg, args...)
 }
 
 func Warn(msg string, args ...any) {
-	logger.Warn(msg, args...)
+	logger.log(context.Background(), slog.LevelWarn, msg, args...)
 }
 
 func Error(msg string, args ...any) {
-	logger.Error(msg, args...)
+	logger.log(context.Background(), slog.LevelError, msg, args...)
 }
 
 func With(args ...any) *Logger {
