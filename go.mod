@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/litsea/sentry-slog v0.2.1
-	github.com/samber/slog-multi v1.4.0
+	github.com/samber/slog-multi v1.4.1
 	github.com/spf13/viper v1.20.1
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
@@ -18,7 +18,7 @@ require (
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/sagikazarmark/locafero v0.9.0 // indirect
 	github.com/samber/lo v1.51.0 // indirect
-	github.com/samber/slog-common v0.18.1 // indirect
+	github.com/samber/slog-common v0.19.0 // indirect
 	github.com/samber/slog-sentry/v2 v2.9.3 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.14.0 // indirect
