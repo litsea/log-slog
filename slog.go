@@ -9,7 +9,8 @@ import (
 	"strings"
 	"time"
 
-	sentry "github.com/litsea/sentry-slog"
+	"github.com/getsentry/sentry-go"
+	sentryslog "github.com/litsea/sentry-slog"
 	slogmulti "github.com/samber/slog-multi"
 	"github.com/spf13/viper"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -43,6 +44,8 @@ const (
 	LevelWarn  = "warn"
 	LevelError = "error"
 )
+
+var sentryHub *sentry.Hub
 
 func New(v *viper.Viper, opts ...Option) (*Logger, error) {
 	if v == nil {
@@ -206,18 +209,20 @@ func getLevel(sub *viper.Viper) *slog.LevelVar {
 }
 
 func (l *Logger) newSentryHandler(sub *viper.Viper) (slog.Handler, error) {
-	h, err := sentry.NewHandler(
-		sentry.WithDSN(sub.GetString("dsn")),
-		sentry.WithEnvironment(sub.GetString("env")),
-		sentry.WithRelease(l.gitRev),
-		sentry.WithDebug(sub.GetBool("debug")),
+	sentryHub = sentry.NewHub(nil, sentry.NewScope())
+	h, err := sentryslog.NewHandler(
+		sentryslog.WithSentryHub(sentryHub),
+		sentryslog.WithDSN(sub.GetString("dsn")),
+		sentryslog.WithEnvironment(sub.GetString("env")),
+		sentryslog.WithRelease(l.gitRev),
+		sentryslog.WithDebug(sub.GetBool("debug")),
 		// Other log handlers can set the stacktrace in the log attributes,
 		// But for the Sentry handler, we use `sentry.WithAttachStacktrace(true)` to capture the stacktrace,
 		// So we need to ignore it here
 		// See:
 		// github.com/samber/slog-sentry/converter.go#DefaultConverter
 		// github.com/samber/slog-common/attributes.go#RemoveEmptyAttrs()
-		sentry.WithLogReplaceAttr(func(groups []string, a slog.Attr) slog.Attr {
+		sentryslog.WithLogReplaceAttr(func(groups []string, a slog.Attr) slog.Attr {
 			if a.Key == "stacktrace" {
 				a.Key = ""
 			}
@@ -229,4 +234,10 @@ func (l *Logger) newSentryHandler(sub *viper.Viper) (slog.Handler, error) {
 	}
 
 	return h, nil
+}
+
+func SentryFlush(d time.Duration) {
+	if sentryHub != nil {
+		sentryHub.Flush(d)
+	}
 }
