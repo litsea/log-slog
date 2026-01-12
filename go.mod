@@ -5,7 +5,7 @@ go 1.24.0
 require (
 	github.com/getsentry/sentry-go v0.40.0
 	github.com/litsea/sentry-slog v0.2.3
-	github.com/samber/slog-multi v1.6.0
+	github.com/samber/slog-multi v1.7.0
 	github.com/spf13/viper v1.21.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
